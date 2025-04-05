@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Ninja Treasure Catcher</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      text-align: center;
+      background: #222;
+      color: white;
+    }
+    h1 {
+      margin-top: 10px;
+    }
+    .info {
+      font-size: 20px;
+      margin: 10px 0;
+    }
+    #game-container {
+      position: relative;
+      width: 600px;
+      height: 400px;
+      margin: 0 auto;
+      overflow: hidden;
+      border: 3px solid #fff;
+      background-color: #87ceeb;
+    }
+    #background {
+      position: absolute;
+      width: 100%;
+      height: 200%;
+      background: url('https://www.transparenttextures.com/patterns/gray-floral.png');
+      animation: scrollBg 10s linear infinite;
+    }
+    @keyframes scrollBg {
+      0% { top: 0; }
+      100% { top: -100%; }
+    }
+    #player {
+      position: absolute;
+      bottom: 10px;
+      left: 270px;
+      width: 60px;
+      height: 60px;
+      background-image: url('https://cdn-icons-png.flaticon.com/512/439/439842.png'); /* Ninja icon */
+      background-size: contain;
+      background-repeat: no-repeat;
+    }
+    .coin {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      background-image: url('https://cdn-icons-png.flaticon.com/512/854/854878.png');
+      background-size: cover;
+    }
+    .power-up {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      background-size: cover;
+      z-index: 10;
+    }
+    .magnet {
+      background-image: url('https://cdn-icons-png.flaticon.com/512/189/189715.png');
+    }
+    .double-points {
+      background-image: url('https://cdn-icons-png.flaticon.com/512/1010/1010607.png');
+    }
+    #controls {
+      margin-top: 10px;
+    }
+    #controls button {
+      font-size: 30px;
+      padding: 10px 20px;
+      margin: 0 10px;
+      border: none;
+      border-radius: 10px;
+      background-color: #444;
+      color: white;
+    }
+    #game-over {
+      font-size: 24px;
+      margin-top: 20px;
+      color: red;
+    }
+    .hidden {
+      display: none;
+    }
+    #restart-btn {
+      margin-top: 15px;
+      font-size: 20px;
+      padding: 10px 20px;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>🥷 Ninja Treasure Catcher</h1>
+  <div class="info">
+    Score: <span id="score">0</span>
+  </div>
+  <div id="game-container">
+    <div id="background"></div>
+    <div id="player"></div>
+  </div>
+  <div id="controls">
+    <button id="left">◀️</button>
+    <button id="right">▶️</button>
+  </div>
+  <div id="game-over" class="hidden">
+    Game Over! Final Score: <span id="final-score"></span><br>
+    <button id="restart-btn">🔁 Restart</button>
+  </div>
+
+  <!-- Sound Effect -->
+  <audio id="coin-sound" src="https://freesound.org/data/previews/341/341695_6262624-lq.mp3"></audio>
+
+  <script>
+    const player = document.getElementById('player');
+    const gameContainer = document.getElementById('game-container');
+    const scoreEl = document.getElementById('score');
+    const gameOverEl = document.getElementById('game-over');
+    const finalScoreEl = document.getElementById('final-score');
+    const coinSound = document.getElementById('coin-sound');
+    const restartBtn = document.getElementById('restart-btn');
+
+    let playerX = 270;
+    let score = 0;
+    let isGameOver = false;
+    let magnetActive = false;
+    let doublePointsActive = false;
+    let gameInterval = null;
+
+    function movePlayer(amount) {
+      playerX += amount;
+      if (playerX < 0) playerX = 0;
+      if (playerX > 540) playerX = 540;
+      player.style.left = playerX + 'px';
+    }
+
+    // Controls
+    document.addEventListener('keydown', (e) => {
+      if (isGameOver) return;
+      if (e.key === 'ArrowLeft') movePlayer(-20);
+      if (e.key === 'ArrowRight') movePlayer(20);
+    });
+    document.getElementById('left').addEventListener('touchstart', () => movePlayer(-20));
+    document.getElementById('right').addEventListener('touchstart', () => movePlayer(20));
+
+    function createCoin() {
+      const coin = document.createElement('div');
+      coin.classList.add('coin');
+      coin.style.left = Math.random() * 560 + 'px';
+      coin.style.top = '0px';
+      gameContainer.appendChild(coin);
+
+      const fallInterval = setInterval(() => {
+        if (isGameOver) {
+          coin.remove();
+          clearInterval(fallInterval);
+          return;
+        }
+
+        let top = parseInt(coin.style.top);
+        coin.style.top = top + 5 + 'px';
+
+        if (magnetActive) {
+          let coinX = parseInt(coin.style.left);
+          let targetX = playerX + 30 - 20;
+          let dx = targetX - coinX;
+          coin.style.left = coinX + dx * 0.1 + 'px';
+        }
+
+        const coinRect = coin.getBoundingClientRect();
+        const playerRect = player.getBoundingClientRect();
+
+        if (
+          coinRect.bottom >= playerRect.top &&
+          coinRect.left < playerRect.right &&
+          coinRect.right > playerRect.left
+        ) {
+          let earned = doublePointsActive ? 20 : 10;
+          score += earned;
+          scoreEl.textContent = score;
+          coinSound.currentTime = 0;
+          coinSound.play();
+          coin.remove();
+          clearInterval(fallInterval);
+        }
+
+        if (top > 400) {
+          coin.remove();
+          clearInterval(fallInterval);
+        }
+      }, 30);
+    }
+
+    function createPowerUp() {
+      const type = Math.random() < 0.5 ? 'magnet' : 'double-points';
+      const powerUp = document.createElement('div');
+      powerUp.classList.add('power-up', type);
+      powerUp.style.left = Math.random() * 560 + 'px';
+      powerUp.style.top = '0px';
+      gameContainer.appendChild(powerUp);
+
+      const fallInterval = setInterval(() => {
+        if (isGameOver) {
+          powerUp.remove();
+          clearInterval(fallInterval);
+          return;
+        }
+
+        let top = parseInt(powerUp.style.top);
+        powerUp.style.top = top + 4 + 'px';
+
+        const powerRect = powerUp.getBoundingClientRect();
+        const playerRect = player.getBoundingClientRect();
+
+        if (
+          powerRect.bottom >= playerRect.top &&
+          powerRect.left < playerRect.right &&
+          powerRect.right > playerRect.left
+        ) {
+          activatePowerUp(type);
+          powerUp.remove();
+          clearInterval(fallInterval);
+        }
+
+        if (top > 400) {
+          powerUp.remove();
+          clearInterval(fallInterval);
+        }
+      }, 30);
+    }
+
+    function activatePowerUp(type) {
+      if (type === 'magnet') {
+        magnetActive = true;
+        player.style.boxShadow = '0 0 15px red';
+        setTimeout(() => {
+          magnetActive = false;
+          player.style.boxShadow = 'none';
+        }, 7000);
+      }
+      if (type === 'double-points') {
+        doublePointsActive = true;
+        scoreEl.style.color = 'gold';
+        setTimeout(() => {
+          doublePointsActive = false;
+          scoreEl.style.color = 'white';
+        }, 7000);
+      }
+    }
+
+    function startGame() {
+      isGameOver = false;
+      score = 0;
+      playerX = 270;
+      scoreEl.textContent = score;
+      player.style.left = playerX + 'px';
+      gameOverEl.classList.add('hidden');
+
+      // Remove existing coins and power-ups
+      document.querySelectorAll('.coin, .power-up').forEach(el => el.remove());
+
+      gameInterval = setInterval(() => {
+        if (!isGameOver) {
+          createCoin();
+          if (Math.random() < 0.3) createPowerUp();
+        }
+      }, 800);
+
+      setTimeout(() => {
+        isGameOver = true;
+        clearInterval(gameInterval);
+        finalScoreEl.textContent = score;
+        gameOverEl.classList.remove('hidden');
+      }, 30000);
+    }
+
+    restartBtn.addEventListener('click', startGame);
+
+    startGame();
+  </script>
+</body>
+</html>
+
